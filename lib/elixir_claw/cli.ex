@@ -66,12 +66,17 @@ defmodule ElixirClaw.CLI do
   defp parse_args(_), do: {:error, :unknown_command}
 
   defp parse_node_register([]), do: {:ok, {:node_register, %{}}}
+
   defp parse_node_register(["--wait-for-approval" | rest]) do
     case parse_node_register(rest) do
-      {:ok, {:node_register, opts}} -> {:ok, {:node_register, Map.put(opts, :wait_for_approval, true)}}
-      error -> error
+      {:ok, {:node_register, opts}} ->
+        {:ok, {:node_register, Map.put(opts, :wait_for_approval, true)}}
+
+      error ->
+        error
     end
   end
+
   defp parse_node_register(["--display-name", name | rest]) do
     case parse_node_register(rest) do
       {:ok, {:node_register, opts}} -> {:ok, {:node_register, Map.put(opts, :display_name, name)}}
@@ -80,6 +85,7 @@ defmodule ElixirClaw.CLI do
   end
 
   defp parse_node_start([]), do: {:ok, {:node_start, %{}}}
+
   defp parse_node_start(["--display-name", name | rest]) do
     case parse_node_start(rest) do
       {:ok, {:node_start, opts}} -> {:ok, {:node_start, Map.put(opts, :display_name, name)}}
@@ -88,6 +94,7 @@ defmodule ElixirClaw.CLI do
   end
 
   defp parse_node_stop([]), do: {:ok, {:node_stop, %{}}}
+
   defp parse_node_stop([node_id | _]) do
     {:ok, {:node_stop, %{node_id: node_id}}}
   end
@@ -101,6 +108,7 @@ defmodule ElixirClaw.CLI do
   end
 
   defp parse_kv_pairs([]), do: %{}
+
   defp parse_kv_pairs(["--" <> key | [value | rest]]) do
     Map.put(parse_kv_pairs(rest), String.to_atom(key), value)
   end
@@ -167,7 +175,7 @@ defmodule ElixirClaw.CLI do
       {:error, :not_found} ->
         IO.puts(:stderr, "Node not found: #{node_id}")
 
-      status ->
+      _status ->
         IO.puts("Stopping node #{node_id}...")
     end
   end
@@ -275,7 +283,7 @@ defmodule ElixirClaw.CLI do
       File.mkdir_p!(dir)
     end
 
-    saveable = 
+    saveable =
       config
       |> Map.drop([:__struct__, :secret_key, :private_key])
       |> Map.to_list()
@@ -285,14 +293,15 @@ defmodule ElixirClaw.CLI do
     case Jason.encode(saveable, pretty: true) do
       {:ok, json} ->
         File.write!(config_path, json)
-        
+
         case :os.type() do
           {:unix, _} ->
             System.cmd("chmod", ["600", config_path])
+
           _ ->
             :ok
         end
-        
+
         IO.puts("Configuration saved to #{config_path}")
 
       {:error, reason} ->
@@ -309,7 +318,10 @@ defmodule ElixirClaw.CLI do
         Path.join(System.get_env("HOME") || "", ".config/elixir_claw/config.json")
 
       {:unix, :linux} ->
-        Path.join(System.get_env("XDG_CONFIG_HOME") || Path.join(System.get_env("HOME") || "", ".config"), "elixir_claw/config.json")
+        Path.join(
+          System.get_env("XDG_CONFIG_HOME") || Path.join(System.get_env("HOME") || "", ".config"),
+          "elixir_claw/config.json"
+        )
     end
   end
 

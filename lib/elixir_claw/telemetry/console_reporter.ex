@@ -23,7 +23,7 @@ defmodule ElixirClaw.Telemetry.ConsoleReporter do
     {:ok, %{}}
   end
 
-  defp handle_event(event, measurements, metadata, _config) do
+  defp handle_event(event, measurements, _metadata, _config) do
     IO.puts("[Telemetry] #{inspect(event)}: #{inspect(measurements)}")
   end
 end

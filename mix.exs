@@ -16,7 +16,8 @@ defmodule ElixirClaw.MixProject do
   def application do
     [
       extra_applications: [:logger, :crypto, :public_key, :ssl],
-      mod: {ElixirClaw.Application, []}
+      mod: {ElixirClaw.Application, []},
+      config_providers: [{ElixirClaw.Config.Provider, []}]
     ]
   end
 

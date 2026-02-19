@@ -8,20 +8,22 @@ defmodule ElixirClaw.Auth do
   defstruct [:device_id, :public_key, :private_key, :node_id, :token, :secret_key]
 
   @doc """
-  Generate a new device identity.
-  Uses Ed25519 if available, otherwise uses HMAC-SHA256.
+  Generate a new device identity using Ed25519 cryptography.
+  Returns an Auth struct with private/public key pair.
   """
   def generate_identity do
     device_id = "device_" <> (:crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower))
 
-    secret_key = :crypto.strong_rand_bytes(32)
-    public_key = :crypto.hash(:sha256, secret_key)
+    # Generate Ed25519 key pair
+    {private_key_raw, public_key_raw} = :crypto.generate_key(:eddsa, :ed25519)
 
     %Auth{
       device_id: device_id,
-      public_key: Base.encode64(public_key, padding: false),
-      private_key: nil,
-      secret_key: Base.encode64(secret_key, padding: false)
+      public_key: Base.encode64(public_key_raw, padding: false),
+      private_key: Base.encode64(private_key_raw, padding: false),
+      secret_key: nil,
+      node_id: nil,
+      token: nil
     }
   end
 
@@ -76,24 +78,38 @@ defmodule ElixirClaw.Auth do
   end
 
   @doc """
-  Sign a challenge with the device secret key using HMAC-SHA256.
+  Sign a challenge with the device private key using Ed25519.
   """
+  def sign_challenge(%Auth{private_key: private_key}, challenge) when is_binary(private_key) do
+    decoded_private = Base.decode64!(private_key, padding: false)
+
+    # Ed25519 signature using :crypto module
+    :crypto.sign(:eddsa, :none, challenge, [decoded_private, :ed25519])
+    |> Base.encode64(padding: false)
+  end
+
+  # Backward compatibility for old HMAC-based identities
   def sign_challenge(%Auth{secret_key: secret_key}, challenge) when is_binary(secret_key) do
     decoded_secret = Base.decode64!(secret_key, padding: false)
     signature = :crypto.mac(:hmac, :sha256, decoded_secret, challenge)
     Base.encode64(signature, padding: false)
   end
 
-  def sign_challenge(%Auth{private_key: key}, challenge) when is_binary(key) do
-    decoded_key = Base.decode64!(key, padding: false)
-    signature = :crypto.mac(:hmac, :sha256, decoded_key, challenge)
-    Base.encode64(signature, padding: false)
+  @doc """
+  Verify a signature using Ed25519 public key.
+  """
+  def verify_signature(%Auth{public_key: public_key}, challenge, signature)
+      when is_binary(public_key) and is_binary(signature) do
+    decoded_public = Base.decode64!(public_key, padding: false)
+    decoded_sig = Base.decode64!(signature, padding: false)
+
+    # Ed25519 verification using :crypto module
+    :crypto.verify(:eddsa, :none, challenge, decoded_sig, [decoded_public, :ed25519])
   end
 
-  @doc """
-  Verify a signature.
-  """
-  def verify_signature(%Auth{public_key: key}, challenge, signature) when is_binary(key) and is_binary(signature) do
+  # Backward compatibility for old HMAC-based identities
+  def verify_signature(%Auth{secret_key: key}, challenge, signature)
+      when is_binary(key) and is_binary(signature) do
     decoded_key = Base.decode64!(key, padding: false)
     decoded_sig = Base.decode64!(signature, padding: false)
 
@@ -105,6 +121,7 @@ defmodule ElixirClaw.Auth do
     case :os.type() do
       {:unix, _} ->
         System.cmd("chmod", ["600", path])
+        :ok
 
       _ ->
         :ok

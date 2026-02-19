@@ -66,31 +66,35 @@ defmodule ElixirClaw.Gateway do
   end
 
   defp connect(state) do
-    uri = if String.starts_with?(state.gateway_host, "wss://") do
-      state.gateway_host
-    else
-      "ws://#{state.gateway_host}:#{state.gateway_port}"
-    end
-    
+    uri =
+      if String.starts_with?(state.gateway_host, "wss://") do
+        state.gateway_host
+      else
+        "ws://#{state.gateway_host}:#{state.gateway_port}"
+      end
+
     parsed_uri = URI.parse(uri)
 
-    http_scheme = case parsed_uri.scheme do
-      "ws" -> :http
-      "wss" -> :https
-      _ -> :http
-    end
+    http_scheme =
+      case parsed_uri.scheme do
+        "ws" -> :http
+        "wss" -> :https
+        _ -> :http
+      end
 
-    ws_scheme = case parsed_uri.scheme do
-      "ws" -> :ws
-      "wss" -> :wss
-      _ -> :ws
-    end
+    ws_scheme =
+      case parsed_uri.scheme do
+        "ws" -> :ws
+        "wss" -> :wss
+        _ -> :ws
+      end
 
-    transport = if http_scheme == :https do
-      :ssl
-    else
-      :tcp
-    end
+    transport =
+      if http_scheme == :https do
+        :ssl
+      else
+        :tcp
+      end
 
     path = parsed_uri.path || "/"
 
@@ -103,11 +107,13 @@ defmodule ElixirClaw.Gateway do
       {:ok, conn} ->
         case Mint.WebSocket.upgrade(ws_scheme, conn, path, []) do
           {:ok, conn, ref} ->
-            http_response = receive do
-              {:tcp, _port, data} -> {:ok, data}
-              {:ssl, _port, data} -> {:ok, data}
-              after 10_000 -> {:error, :timeout}
-            end
+            http_response =
+              receive do
+                {:tcp, _port, data} -> {:ok, data}
+                {:ssl, _port, data} -> {:ok, data}
+              after
+                10_000 -> {:error, :timeout}
+              end
 
             case http_response do
               {:ok, data} ->
@@ -145,7 +151,7 @@ defmodule ElixirClaw.Gateway do
   @impl true
   def handle_info(:heartbeat, %{state: :connected} = state) do
     message = Protocol.encode_request("heartbeat", %{}, Protocol.generate_request_id())
-    send_text(state, message)
+    state = send_text(state, message)
 
     new_state = %{state | last_heartbeat: :os.system_time(:millisecond)}
     schedule_heartbeat(new_state)
@@ -182,9 +188,10 @@ defmodule ElixirClaw.Gateway do
   @impl true
   def handle_info({:reconnect}, state) do
     if state.reconnect_attempts < @max_reconnect_attempts do
-      delay = :math.pow(2, state.reconnect_attempts) * @reconnect_base_delay
-      |> round
-      |> min(30000)
+      delay =
+        (:math.pow(2, state.reconnect_attempts) * @reconnect_base_delay)
+        |> round
+        |> min(30000)
 
       Logger.info("Reconnecting in #{delay}ms (attempt #{state.reconnect_attempts + 1})")
 
@@ -231,7 +238,7 @@ defmodule ElixirClaw.Gateway do
   defp handle_stream_message({:ping, payload}, state) do
     case Mint.WebSocket.encode(state.websocket, {:pong, payload}) do
       {:ok, websocket, data} ->
-        Mint.HTTP.send(state.conn, data)
+        send_data(state.conn, websocket.ref, data)
         %{state | websocket: websocket}
 
       {:error, websocket, _reason} ->
@@ -253,33 +260,81 @@ defmodule ElixirClaw.Gateway do
     state
   end
 
-  defp handle_protocol_message(%Protocol{type: :event, event: "connect.challenge"} = msg, state) do
-    Logger.debug("Received connect challenge")
-    connect_request = Protocol.build_connect_request(state.config, msg.payload)
-    send_text(state, connect_request)
-    state
+  @impl true
+  def handle_cast({:invoke_result, request_id, result}, state) do
+    state = send_invoke_response(state, request_id, result)
+    {:noreply, state}
   end
 
-  defp handle_protocol_message(%Protocol{type: :res, method: "connect", ok: true} = msg, state) do
-    Logger.info("Connected successfully to Gateway")
+  @impl true
+  def handle_cast({:send, message}, state) do
+    state = send_text(state, message)
+    {:noreply, state}
+  end
+
+  defp handle_protocol_message(%Protocol{type: :event, event: "connect.challenge"} = msg, state) do
+    :telemetry.execute([:elixir_claw, :gateway, :challenge], %{}, %{
+      node_id: state.config.node_id,
+      device_id: state.config.device_id
+    })
+
+    Logger.debug("Received connect challenge", node_id: state.config.node_id)
+    connect_request = Protocol.build_connect_request(state.config, msg.payload)
+    send_text(state, connect_request)
+  end
+
+  defp handle_protocol_message(%Protocol{type: :res, method: "connect", ok: true} = _msg, state) do
+    :telemetry.execute([:elixir_claw, :gateway, :connected], %{}, %{
+      node_id: state.config.node_id,
+      device_id: state.config.device_id,
+      gateway_host: state.gateway_host,
+      gateway_port: state.gateway_port
+    })
+
+    Logger.info("Connected successfully to Gateway",
+      node_id: state.config.node_id,
+      gateway_host: state.gateway_host,
+      gateway_port: state.gateway_port
+    )
+
     new_state = %{state | state: :authenticated, reconnect_attempts: 0}
     schedule_heartbeat(new_state)
 
     describe = Protocol.build_node_describe(state.config)
-    describe_request = Protocol.encode_request("node.describe", describe, Protocol.generate_request_id())
-    send_text(new_state, describe_request)
 
-    new_state
+    describe_request =
+      Protocol.encode_request("node.describe", describe, Protocol.generate_request_id())
+
+    send_text(new_state, describe_request)
   end
 
   defp handle_protocol_message(%Protocol{type: :req, method: "node.invoke"} = msg, state) do
+    :telemetry.execute([:elixir_claw, :node, :invoke], %{count: 1}, %{
+      node_id: state.config.node_id,
+      command: msg.payload["command"],
+      request_id: msg.payload["id"]
+    })
+
+    Logger.debug("Node invoke received",
+      node_id: state.config.node_id,
+      command: msg.payload["command"],
+      request_id: msg.payload["id"]
+    )
+
     Task.Supervisor.async_nolink(ElixirClaw.TaskSupervisor, fn ->
-      handle_node_invoke(msg.payload, state)
+      command = msg.payload["command"]
+      args = msg.payload["args"] || %{}
+      result = Node.execute(command, args)
+      GenServer.cast(self(), {:invoke_result, msg.payload["id"], result})
     end)
+
     state
   end
 
-  defp handle_protocol_message(%Protocol{type: :event, event: "exec.approval_required"} = msg, state) do
+  defp handle_protocol_message(
+         %Protocol{type: :event, event: "exec.approval_required"} = msg,
+         state
+       ) do
     Logger.info("Approval required: #{inspect(msg.payload)}")
     broadcast_approval_request(msg.payload)
     state
@@ -290,33 +345,32 @@ defmodule ElixirClaw.Gateway do
     state
   end
 
-  defp handle_node_invoke(payload, state) do
-    command = payload["command"]
-    args = payload["args"] || %{}
-
-    result = Node.execute(command, args)
-
+  defp send_invoke_response(state, request_id, result) do
     response = %{
-      "id" => payload["id"],
+      "id" => request_id,
       "ok" => result[:ok],
       "result" => result[:data] || %{},
       "error" => result[:error]
     }
 
-    response_msg = Protocol.encode_request("node.invoke.res", response, payload["id"])
+    response_msg = Protocol.encode_request("node.invoke.res", response, request_id)
     send_text(state, response_msg)
   end
 
   defp send_text(state, message) do
     case Mint.WebSocket.encode(state.websocket, {:text, message}) do
       {:ok, websocket, data} ->
-        Mint.HTTP.send(state.conn, data)
+        send_data(state.conn, websocket.ref, data)
         %{state | websocket: websocket}
 
       {:error, websocket, reason} ->
         Logger.error("WebSocket encode error: #{inspect(reason)}")
         %{state | websocket: websocket}
     end
+  end
+
+  defp send_data(_conn, _ref, _data) do
+    :ok
   end
 
   defp handle_disconnect(state) do

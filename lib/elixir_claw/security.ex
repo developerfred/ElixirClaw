@@ -29,14 +29,20 @@ defmodule ElixirClaw.Security do
   @doc """
   Validate and sanitize a file path to prevent path traversal.
   """
-  def sanitize_path(path) do
-    safe = Path.safe_relative(path)
-    if safe == path or safe == "." do
-      {:ok, path}
-    else
-      {:error, :invalid_path}
+  def sanitize_path(path) when is_binary(path) do
+    case Path.safe_relative(path) do
+      {:ok, safe_path} ->
+        if safe_path == path or safe_path == "." do
+          {:ok, path}
+        else
+          {:error, :invalid_path}
+        end
+      :error ->
+        {:error, :invalid_path}
     end
   end
+
+  def sanitize_path(_), do: {:error, :invalid_path}
 
   @doc """
   Validate a command is safe to execute.

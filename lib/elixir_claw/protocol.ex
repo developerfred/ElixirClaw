@@ -99,17 +99,18 @@ defmodule ElixirClaw.Protocol do
   def build_connect_request(config, challenge) do
     timestamp = :os.system_time(:millisecond)
 
-    device = if config[:device_id] do
-      %{
-        "id" => config.device_id,
-        "publicKey" => config.public_key || "",
-        "signature" => sign_challenge(config, challenge, timestamp),
-        "signedAt" => timestamp,
-        "nonce" => challenge["nonce"]
-      }
-    else
-      %{}
-    end
+    device =
+      if config[:device_id] do
+        %{
+          "id" => config.device_id,
+          "publicKey" => config.public_key || "",
+          "signature" => sign_challenge(config, challenge, timestamp),
+          "signedAt" => timestamp,
+          "nonce" => challenge["nonce"]
+        }
+      else
+        %{}
+      end
 
     params = %{
       "minProtocol" => @protocol_version,
@@ -196,8 +197,20 @@ defmodule ElixirClaw.Protocol do
 
   defp sign_challenge(config, challenge, timestamp) do
     message = "#{challenge["nonce"]}#{timestamp}"
-    # For now, return a placeholder. Real implementation would use Ed25519
-    Base.encode16(:crypto.hash(:sha256, message))
+
+    # Use Auth module to sign with Ed25519 if identity available
+    if config[:device_id] && config[:private_key] do
+      identity = %ElixirClaw.Auth{
+        device_id: config.device_id,
+        private_key: config.private_key,
+        public_key: config.public_key
+      }
+
+      ElixirClaw.Auth.sign_challenge(identity, message)
+    else
+      # Fallback for backward compatibility or missing identity
+      Base.encode16(:crypto.hash(:sha256, message))
+    end
   end
 
   defp get_device_model do

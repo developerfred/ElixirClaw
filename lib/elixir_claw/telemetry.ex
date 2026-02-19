@@ -5,8 +5,20 @@ defmodule ElixirClaw.Telemetry do
 
   require Logger
 
-  def execute(event, measurements, metadata, config) do
-    Logger.debug("Telemetry: #{event}", metadata: metadata)
+  def execute(event, measurements, metadata, _config) do
+    node_id =
+      metadata[:node_id] || metadata[:device_id] || metadata["node_id"] || metadata["device_id"]
+
+    command = metadata[:command] || metadata[:method] || metadata["command"] || metadata["method"]
+
+    Logger.debug("Telemetry: #{event}",
+      node_id: node_id,
+      command: command,
+      event: List.last(event),
+      measurements: measurements,
+      metadata:
+        Map.drop(metadata, [:node_id, :device_id, :command, :method, :module, :function, :line])
+    )
   end
 
   def attach_handlers do
