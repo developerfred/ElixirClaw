@@ -36,6 +36,18 @@ mix escript.build
 ./elixir_claw node-start
 ```
 
+### Watch the Demo
+
+[![asciicast](https://asciinema.org/a/example.svg)](https://asciinema.org/a/example)
+
+Or run locally:
+```bash
+# Record your own demo
+asciinema rec demo.cast
+# Play it back
+asciinema play demo.cast
+```
+
 ### With Docker
 
 ```bash
