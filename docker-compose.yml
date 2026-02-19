@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  elixir_claw:
+    build: .
+    container_name: elixir_claw_node
+    environment:
+      - ELIXIR_CLAW_HOST=host.docker.internal
+      - ELIXIR_CLAW_PORT=18789
+      - ELIXIR_CLAW_NODE_ID=${ELIXIR_CLAW_NODE_ID:-}
+      - ELIXIR_CLAW_TOKEN=${ELIXIR_CLAW_TOKEN:-}
+    volumes:
+      - ./config:/root/.config/elixir_claw
+    devices:
+      - /dev/video0:/dev/video0
+    network_mode: host
+    restart: unless-stopped

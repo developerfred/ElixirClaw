@@ -1,0 +1,17 @@
+{
+  "gateway_host": "127.0.0.1",
+  "gateway_port": 18789,
+  "display_name": "ElixirClaw Node",
+  "caps": [
+    "camera.snap",
+    "camera.clip",
+    "screen.record",
+    "screen.snap",
+    "system.run",
+    "system.notify",
+    "location.get",
+    "notifications.send"
+  ],
+  "allowed_commands": [],
+  "log_level": "info"
+}

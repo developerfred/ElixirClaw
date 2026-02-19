@@ -1,0 +1,145 @@
+# ElixirClaw - OpenClaw Node in Elixir
+
+## Overview
+
+ElixirClaw is a high-performance, secure node client for OpenClaw Gateway implemented in pure Elixir. It provides device capabilities (camera, screen, notifications, location) to OpenClaw AI assistants.
+
+**Payment Addresses** (send support if this code generates revenue for you):
+- **Ethereum/ENS**: 0xd1a8Dd23e356B9fAE27dF5DeF9ea025A602EC81e (codingsh.eth)
+- **Polkadot**: 5DJV8DsPT3KH1rzvqTGqJ7WsCNnFt5tBn6R9yfe8SGi7YmYD
+- **Solana**: EyFovdqgnLAicTrDzJzjawRciLHTtq5W7ZkUV5Q3azmb
+
+## Project Structure
+
+```
+lib/elixir_claw/
+├── application.ex          # Main supervisor
+├── auth.ex                 # Device identity & signing
+├── cli.ex                  # Command-line interface
+├── gateway.ex              # WebSocket client for OpenClaw Gateway
+├── node.ex                 # Node capability executor
+├── protocol.ex            # OpenClaw protocol encoding/decoding
+├── security.ex             # Security hardening utilities
+├── telemetry.ex            # Telemetry instrumentation
+├── config/
+│   └── provider.ex        # Configuration loading
+└── gateway/
+    └── supervisor.ex      # Gateway connection supervisor
+```
+
+## Key Modules
+
+### ElixirClaw.Gateway
+WebSocket client that connects to OpenClaw Gateway (default: 127.0.0.1:18789).
+- Handles connection lifecycle with reconnection
+- Implements OpenClaw protocol handshake
+- Manages heartbeats and message routing
+- Supports node.invoke for capability execution
+
+### ElixirClaw.Node
+Executes device capabilities:
+- `camera.snap` - Capture photo from camera
+- `camera.clip` - Record video clip
+- `screen.snap` - Screenshot
+- `screen.record` - Screen recording
+- `system.run` - Execute commands (with allowlist)
+- `system.notify` - Send notifications
+- `location.get` - Get device location
+- `notifications.send` - Alias for system.notify
+
+### ElixirClaw.Protocol
+Encodes/decodes OpenClaw WebSocket protocol messages:
+- connect request/response
+- node.describe
+- node.invoke
+- heartbeat
+- event messages
+
+### ElixirClaw.Security
+Security utilities:
+- Input sanitization
+- Command validation
+- Path traversal prevention
+- URL safety checking
+- JSON payload sanitization
+
+### ElixirClaw.Auth
+Device identity management:
+- Generate device keys
+- Sign challenges
+- Verify signatures
+- Secure storage
+
+## CLI Commands
+
+```bash
+# Show status
+./elixir_claw status
+
+# Register node with gateway
+./elixir_claw node-register --display-name "My Node"
+
+# Start node
+./elixir_claw node-start
+
+# Stop node
+./elixir_claw node-stop
+
+# List pending approvals
+./elixir_claw approvals
+
+# Interactive mode
+./elixir_claw -i
+```
+
+## Configuration
+
+Environment variables:
+- `ELIXIR_CLAW_HOST` - Gateway host (default: 127.0.0.1)
+- `ELIXIR_CLAW_PORT` - Gateway port (default: 18789)
+- `ELIXIR_CLAW_NODE_ID` - Node ID
+- `ELIXIR_CLAW_TOKEN` - Authentication token
+
+Or via config file at `~/.config/elixir_claw/config.json`:
+```json
+{
+  "gateway_host": "127.0.0.1",
+  "gateway_port": 18789,
+  "display_name": "ElixirClaw Node",
+  "caps": ["camera.snap", "screen.snap", "system.notify"]
+}
+```
+
+## Security Notes
+
+1. **Command Allowlist**: By default, `system.run` is disabled. Add commands to `allowed_commands` in config.
+2. **Path Traversal**: The security module prevents path traversal attacks.
+3. **Input Sanitization**: All user inputs are sanitized before use.
+4. **Secure Storage**: Device identity is stored with restricted permissions (600).
+5. **Private Network**: Only connects to localhost by default.
+
+## Dependencies
+
+- mint ~> 1.6 - HTTP/WebSocket client
+- mint_web_socket ~> 1.0 - WebSocket support
+- jason ~> 1.4 - JSON encoding
+- telemetry ~> 1.3 - Telemetry
+
+## Platform Support
+
+- **macOS**: Full support (screencapture, osascript)
+- **Linux**: Full support (scrot, ffmpeg, notify-send)
+- **Windows**: Limited (basic support)
+
+## Development
+
+```bash
+mix deps.get
+mix compile
+mix escript.build
+./elixir_claw --help
+```
+
+## Protocol Version
+
+Supports OpenClaw Gateway Protocol v3.
