@@ -44,13 +44,19 @@ defmodule ElixirClaw.Protocol do
     Jason.encode!(message)
   end
 
+  @max_message_size 1_000_000
+
   @doc """
   Decode a JSON binary message to Protocol struct.
   """
   def decode(message) when is_binary(message) do
-    case Jason.decode(message) do
-      {:ok, map} -> decode_map(map)
-      error -> error
+    if byte_size(message) > @max_message_size do
+      {:error, :message_too_large}
+    else
+      case Jason.decode(message) do
+        {:ok, map} -> decode_map(map)
+        error -> error
+      end
     end
   end
 

@@ -1,8 +1,8 @@
 # ElixirClaw 🦞⚡
 
 <p align="center">
-  <img src="https://img.shields.io/github/stars/fredericksilva/elixir-claw" alt="stars">
-  <img src="https://img.shields.io/github/license/fredericksilva/elixir-claw" alt="license">
+  <img src="https://img.shields.io/github/stars/developerfred/ElixirClaw" alt="stars">
+  <img src="https://img.shields.io/github/license/developerfred/ElixirClaw" alt="license">
   <img src="https://img.shields.io/elixir/v/elixir_claw" alt="elixir">
 </p>
 
@@ -24,7 +24,7 @@
 
 ```bash
 # Clone and build
-git clone https://github.com/fredericksilva/elixir-claw.git
+git clone https://github.com/developerfred/ElixirClaw.git
 cd elixir-claw
 mix deps.get
 mix escript.build
