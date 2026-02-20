@@ -2,7 +2,7 @@ defmodule ElixirClaw.LLM do
   @moduledoc """
   LLM Integration module for ElixirClaw.
 
-  Provides a bridge between LLM APIs (Claude, GPT-4, etc.) and ElixirClaw capabilities.
+  Provides a bridge between LLM APIs (Claude, GPT-4, NVIDIA, OpenRouter, OpenCode) and ElixirClaw capabilities.
   This demonstrates the core use case: an AI assistant that can control devices
   through natural language commands.
 
@@ -18,7 +18,56 @@ defmodule ElixirClaw.LLM do
 
       export ANTHROPIC_API_KEY=your_key_here
       export OPENAI_API_KEY=your_key_here
+      export NVIDIA_API_KEY=your_key_here
+      export OPENROUTER_API_KEY=your_key_here
+      export OPENCODE_API_KEY=your_key_here
+
+  ## Providers
+
+  - `:claude` - Anthropic Claude (default)
+  - `:openai` - OpenAI GPT-4
+  - `:nvidia` - NVIDIA NIM API
+  - `:openrouter` - OpenRouter (multi-model)
+  - `:opencode` - OpenCode API
   """
+
+  @providers [:claude, :openai, :nvidia, :openrouter, :opencode]
+
+  @doc """
+  Unified chat interface - automatically selects provider based on opts.
+
+  ## Options
+
+    * `:provider` - Provider atom (:claude, :openai, :nvidia, :openrouter, :opencode)
+    * `:api_key` - API key (or use environment variable)
+    * `:model` - Model identifier
+    * `:node_id` - Node ID for command execution
+
+  ## Examples
+
+      iex> ElixirClaw.LLM.chat("Take a screenshot", provider: :nvidia)
+      {:ok, "I've captured a screenshot..."}
+
+      iex> ElixirClaw.LLM.chat("What's my location?", provider: :openrouter, model: "anthropic/claude-3-opus")
+      {:ok, "Your location is..."}
+  """
+  def chat(message, opts \\ []) do
+    provider = opts[:provider] || :claude
+
+    case provider do
+      :claude -> chat_with_claude(message, opts)
+      :openai -> chat_with_gpt4(message, opts)
+      :nvidia -> chat_with_nvidia(message, opts)
+      :openrouter -> chat_with_openrouter(message, opts)
+      :opencode -> chat_with_opencode(message, opts)
+      _ -> {:error, {:unknown_provider, provider}}
+    end
+  end
+
+  @doc """
+  List available providers.
+  """
+  def providers, do: @providers
 
   @doc """
   Chat with Claude and execute ElixirClaw commands based on the response.
@@ -69,6 +118,118 @@ defmodule ElixirClaw.LLM do
       case call_openai_api(api_key, model, system_prompt, message) do
         {:ok, response_text} ->
           handle_gpt4_response(response_text, node_id)
+
+        error ->
+          error
+      end
+    end
+  end
+
+  @doc """
+  Chat with NVIDIA NIM API and execute ElixirClaw commands.
+
+  NVIDIA NIM provides access to various models including Llama, Mistral, etc.
+
+  ## Options
+
+    * `:api_key` - NVIDIA API key (or NVIDIA_API_KEY env var)
+    * `:model` - Model name (default: "meta/llama-3.1-8b-instruct")
+    * `:node_id` - Node ID for command execution
+
+  ## Examples
+
+      iex> ElixirClaw.LLM.chat_with_nvidia("Take a screenshot")
+      {:ok, "I've taken a screenshot..."}
+  """
+  def chat_with_nvidia(message, opts \\ []) do
+    api_key = opts[:api_key] || System.get_env("NVIDIA_API_KEY")
+    model = opts[:model] || "meta/llama-3.1-8b-instruct"
+    node_id = opts[:node_id] || "llm_node"
+
+    if is_nil(api_key) do
+      {:error, :missing_api_key}
+    else
+      system_prompt = build_system_prompt()
+
+      case call_nvidia_api(api_key, model, system_prompt, message) do
+        {:ok, response_text} ->
+          handle_nvidia_response(response_text, node_id)
+
+        error ->
+          error
+      end
+    end
+  end
+
+  @doc """
+  Chat with OpenRouter API and execute ElixirClaw commands.
+
+  OpenRouter provides unified access to multiple LLM providers.
+
+  ## Options
+
+    * `:api_key` - OpenRouter API key (or OPENROUTER_API_KEY env var)
+    * `:model` - Model name (default: "anthropic/claude-3.5-sonnet")
+    * `:node_id` - Node ID for command execution
+
+  ## Examples
+
+      iex> ElixirClaw.LLM.chat_with_openrouter("Take a screenshot", model: "openai/gpt-4-turbo")
+      {:ok, "I've taken a screenshot..."}
+  """
+  def chat_with_openrouter(message, opts \\ []) do
+    api_key = opts[:api_key] || System.get_env("OPENROUTER_API_KEY")
+    model = opts[:model] || "anthropic/claude-3.5-sonnet"
+    node_id = opts[:node_id] || "llm_node"
+
+    if is_nil(api_key) do
+      {:error, :missing_api_key}
+    else
+      system_prompt = build_system_prompt()
+
+      case call_openrouter_api(api_key, model, system_prompt, message) do
+        {:ok, response_text} ->
+          handle_openrouter_response(response_text, node_id)
+
+        error ->
+          error
+      end
+    end
+  end
+
+  @doc """
+  Chat with OpenCode API and execute ElixirClaw commands.
+
+  OpenCode provides AI coding assistance and device control.
+
+  ## Options
+
+    * `:api_key` - OpenCode API key (or OPENCODE_API_KEY env var)
+    * `:model` - Model name (default: "opencode-default")
+    * `:node_id` - Node ID for command execution
+    * `:base_url` - OpenCode API base URL (default: "https://api.opencode.ai/v1")
+
+  ## Examples
+
+      iex> ElixirClaw.LLM.chat_with_opencode("Take a screenshot")
+      {:ok, "I've taken a screenshot..."}
+  """
+  def chat_with_opencode(message, opts \\ []) do
+    api_key = opts[:api_key] || System.get_env("OPENCODE_API_KEY")
+    model = opts[:model] || "opencode-default"
+    node_id = opts[:node_id] || "llm_node"
+
+    base_url =
+      opts[:base_url] || System.get_env("OPENCODE_BASE_URL") || "https://api.opencode.ai/v1"
+
+    if is_nil(api_key) do
+      {:error, :missing_api_key}
+    else
+      system_prompt = build_system_prompt()
+
+      case call_opencode_api(api_key, model, system_prompt, message, base_url) do
+        {:ok, response_text} ->
+          handle_opencode_response(response_text, node_id)
 
         error ->
           error
@@ -188,6 +349,105 @@ defmodule ElixirClaw.LLM do
     end
   end
 
+  defp call_nvidia_api(api_key, model, system_prompt, message) do
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+
+    headers = [
+      {"authorization", "Bearer #{api_key}"},
+      {"content-type", "application/json"},
+      {"accept", "application/json"}
+    ]
+
+    body = %{
+      model: model,
+      messages: [
+        %{role: "system", content: system_prompt},
+        %{role: "user", content: message}
+      ],
+      max_tokens: 1024,
+      temperature: 0.7,
+      top_p: 1.0
+    }
+
+    case make_post_request(url, headers, body) do
+      {:ok, %{"choices" => [%{"message" => %{"content" => content}} | _]}} ->
+        {:ok, content}
+
+      {:ok, %{"error" => %{"message" => error_msg}}} ->
+        {:error, error_msg}
+
+      error ->
+        error
+    end
+  end
+
+  defp call_openrouter_api(api_key, model, system_prompt, message) do
+    url = "https://openrouter.ai/api/v1/chat/completions"
+
+    headers = [
+      {"authorization", "Bearer #{api_key}"},
+      {"content-type", "application/json"},
+      {"http-referer", "https://elixirclaw.dev"},
+      {"x-title", "ElixirClaw"}
+    ]
+
+    body = %{
+      model: model,
+      messages: [
+        %{role: "system", content: system_prompt},
+        %{role: "user", content: message}
+      ],
+      max_tokens: 1024
+    }
+
+    case make_post_request(url, headers, body) do
+      {:ok, %{"choices" => [%{"message" => %{"content" => content}} | _]}} ->
+        {:ok, content}
+
+      {:ok, %{"error" => %{"message" => error_msg}}} ->
+        {:error, error_msg}
+
+      error ->
+        error
+    end
+  end
+
+  defp call_opencode_api(api_key, model, system_prompt, message, base_url) do
+    url = "#{base_url}/chat/completions"
+
+    headers = [
+      {"authorization", "Bearer #{api_key}"},
+      {"content-type", "application/json"}
+    ]
+
+    body = %{
+      model: model,
+      messages: [
+        %{role: "system", content: system_prompt},
+        %{role: "user", content: message}
+      ],
+      max_tokens: 1024,
+      stream: false
+    }
+
+    case make_post_request(url, headers, body) do
+      {:ok, %{"choices" => [%{"message" => %{"content" => content}} | _]}} ->
+        {:ok, content}
+
+      {:ok, %{"response" => response}} ->
+        {:ok, response}
+
+      {:ok, %{"error" => error_msg}} when is_binary(error_msg) ->
+        {:error, error_msg}
+
+      {:ok, %{"error" => %{"message" => error_msg}}} ->
+        {:error, error_msg}
+
+      error ->
+        error
+    end
+  end
+
   defp make_post_request(url, headers, body) do
     case :httpc.request(:post, {url, headers, 'application/json', Jason.encode!(body)}, [], []) do
       {:ok, {{_, 200, _}, _response_headers, response_body}} ->
@@ -206,6 +466,18 @@ defmodule ElixirClaw.LLM do
   end
 
   defp handle_gpt4_response(response_text, node_id) do
+    {:ok, response_text}
+  end
+
+  defp handle_nvidia_response(response_text, node_id) do
+    {:ok, response_text}
+  end
+
+  defp handle_openrouter_response(response_text, node_id) do
+    {:ok, response_text}
+  end
+
+  defp handle_opencode_response(response_text, node_id) do
     {:ok, response_text}
   end
 

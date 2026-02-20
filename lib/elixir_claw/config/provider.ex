@@ -68,13 +68,29 @@ defmodule ElixirClaw.Config.Provider do
       private_key: nil,
       secret_key: nil,
       token: nil,
-      client_id: "elixir_claw"
+      client_id: "elixir_claw",
+      llm: %{
+        provider: :claude,
+        model: nil,
+        api_keys: %{
+          anthropic: nil,
+          openai: nil,
+          nvidia: nil,
+          openrouter: nil,
+          opencode: nil
+        },
+        base_urls: %{
+          opencode: "https://api.opencode.ai/v1"
+        }
+      }
     }
 
     Map.merge(defaults, config)
   end
 
   defp load_from_env(config) do
+    llm_config = Map.get(config, :llm, %{})
+
     config
     |> Map.put(:gateway_host, System.get_env("ELIXIR_CLAW_HOST", config.gateway_host))
     |> Map.put(
@@ -86,6 +102,41 @@ defmodule ElixirClaw.Config.Provider do
     |> Map.put(:device_id, System.get_env("ELIXIR_CLAW_DEVICE_ID", config.device_id))
     |> Map.put(:display_name, System.get_env("ELIXIR_CLAW_DISPLAY_NAME", config.display_name))
     |> Map.put(:client_id, System.get_env("ELIXIR_CLAW_CLIENT_ID", config.client_id))
+    |> Map.put(:llm, load_llm_config(llm_config))
+  end
+
+  defp load_llm_config(config) do
+    api_keys = Map.get(config, :api_keys, %{})
+    base_urls = Map.get(config, :base_urls, %{})
+
+    %{
+      provider: load_llm_provider(config),
+      model: System.get_env("ELIXIR_CLAW_LLM_MODEL") || config[:model],
+      api_keys: %{
+        anthropic: System.get_env("ANTHROPIC_API_KEY") || api_keys[:anthropic],
+        openai: System.get_env("OPENAI_API_KEY") || api_keys[:openai],
+        nvidia: System.get_env("NVIDIA_API_KEY") || api_keys[:nvidia],
+        openrouter: System.get_env("OPENROUTER_API_KEY") || api_keys[:openrouter],
+        opencode: System.get_env("OPENCODE_API_KEY") || api_keys[:opencode]
+      },
+      base_urls: %{
+        opencode:
+          System.get_env("OPENCODE_BASE_URL") || base_urls[:opencode] ||
+            "https://api.opencode.ai/v1"
+      }
+    }
+  end
+
+  defp load_llm_provider(config) do
+    case System.get_env("ELIXIR_CLAW_LLM_PROVIDER") do
+      nil -> config[:provider] || :claude
+      "claude" -> :claude
+      "openai" -> :openai
+      "nvidia" -> :nvidia
+      "openrouter" -> :openrouter
+      "opencode" -> :opencode
+      unknown -> unknown |> String.to_atom()
+    end
   end
 
   defp generate_node_id do

@@ -144,14 +144,52 @@ Features:
 
 ### LLM Integration
 
-Control ElixirClaw with natural language:
+Control ElixirClaw with natural language through multiple LLM providers:
 
 ```elixir
-# Ask Claude to take a screenshot
-{:ok, response} = ElixirClaw.LLM.chat_with_claude("Take a screenshot")
+# Unified interface - auto-selects provider
+{:ok, response} = ElixirClaw.LLM.chat("Take a screenshot")
 
-# Or use local pattern matching
+# Specific provider selection
+{:ok, response} = ElixirClaw.LLM.chat("Take a screenshot", provider: :nvidia)
+{:ok, response} = ElixirClaw.LLM.chat("Take a screenshot", provider: :openrouter)
+{:ok, response} = ElixirClaw.LLM.chat("Take a screenshot", provider: :opencode)
+
+# Provider-specific functions
+{:ok, response} = ElixirClaw.LLM.chat_with_claude("Take a screenshot")
+{:ok, response} = ElixirClaw.LLM.chat_with_gpt4("Take a screenshot")
+{:ok, response} = ElixirClaw.LLM.chat_with_nvidia("Take a screenshot")
+{:ok, response} = ElixirClaw.LLM.chat_with_openrouter("Take a screenshot")
+{:ok, response} = ElixirClaw.LLM.chat_with_opencode("Take a screenshot")
+
+# Local pattern matching (no API needed)
 {:ok, response} = ElixirClaw.LLM.process_command("screenshot my screen")
+```
+
+#### Supported Providers
+
+| Provider | Environment Variable | Default Model |
+|----------|---------------------|---------------|
+| Claude (Anthropic) | `ANTHROPIC_API_KEY` | claude-3-sonnet-20240229 |
+| OpenAI | `OPENAI_API_KEY` | gpt-4-turbo-preview |
+| NVIDIA NIM | `NVIDIA_API_KEY` | meta/llama-3.1-8b-instruct |
+| OpenRouter | `OPENROUTER_API_KEY` | anthropic/claude-3.5-sonnet |
+| OpenCode | `OPENCODE_API_KEY` | opencode-default |
+
+#### Configuration
+
+Set your preferred provider:
+
+```bash
+# Set default provider
+export ELIXIR_CLAW_LLM_PROVIDER=nvidia
+
+# Set API keys
+export ANTHROPIC_API_KEY=your_key
+export OPENAI_API_KEY=your_key
+export NVIDIA_API_KEY=your_key
+export OPENROUTER_API_KEY=your_key
+export OPENCODE_API_KEY=your_key
 ```
 
 ### Stress Testing
