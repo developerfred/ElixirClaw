@@ -98,11 +98,75 @@ See [COMPARISON.md](./COMPARISON.md) for detailed comparison with ZiggyStarClaw,
 
 ## Roadmap
 
+- [x] Real Ed25519 authentication
+- [x] Unified configuration (Config.Provider)
+- [x] Structured logging with telemetry
+- [x] Progress event streaming
+- [x] Phoenix LiveView Dashboard
+- [x] LLM integration (Claude/GPT-4)
 - [ ] Livebook integration
 - [ ] Nx/Bumblebee for local AI
-- [ ] Phoenix UI dashboard
 - [ ] More platform support
-- [ ] Tests (contributions welcome!)
+
+## Phase 3 Features
+
+### Real-time Event Streaming
+
+Track capability execution progress in real-time:
+
+```elixir
+# Subscribe to events
+ElixirClaw.Events.subscribe("my_node")
+
+# Execute with progress tracking
+ElixirClaw.Node.execute("screen.record", %{duration: 10}, %{
+  node_id: "my_node",
+  request_id: "req_123"
+})
+```
+
+### Phoenix LiveView Dashboard
+
+Monitor your nodes in real-time with a web dashboard:
+
+```bash
+# Start with dashboard enabled
+ELIXIR_CLAW_START_DASHBOARD=true ./elixir_claw node-start
+
+# Open http://localhost:4000
+```
+
+Features:
+- Real-time node status
+- Telemetry visualization
+- Command approval interface
+- Event streaming
+
+### LLM Integration
+
+Control ElixirClaw with natural language:
+
+```elixir
+# Ask Claude to take a screenshot
+{:ok, response} = ElixirClaw.LLM.chat_with_claude("Take a screenshot")
+
+# Or use local pattern matching
+{:ok, response} = ElixirClaw.LLM.process_command("screenshot my screen")
+```
+
+### Stress Testing
+
+Verify 72-hour uptime:
+
+```bash
+./stress_test.sh
+```
+
+Outputs:
+- Memory usage statistics
+- Error rates
+- Connection stability
+- Performance metrics
 
 ## Contributing
 

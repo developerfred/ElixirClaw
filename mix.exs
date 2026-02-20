@@ -28,7 +28,11 @@ defmodule ElixirClaw.MixProject do
       {:mint_web_socket, "~> 1.0"},
       {:jason, "~> 1.4"},
       {:confex, "~> 3.5"},
-      {:telemetry, "~> 1.3"}
+      {:telemetry, "~> 1.3"},
+      {:phoenix, "~> 1.7"},
+      {:phoenix_live_view, "~> 0.20"},
+      {:phoenix_html, "~> 4.0"},
+      {:plug_cowboy, "~> 2.7"}
     ]
   end
 
