@@ -22,3 +22,39 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 elixir_claw-*.tar
 
+# Environment variables - NEVER commit these!
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Secrets - NEVER commit these!
+*.key
+*.pem
+*.crt
+secrets/
+credentials/
+.secrets
+
+# User-specific files
+*.log
+*.dump
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+/test/tmp/
+/priv/static/
+
+# Stress test logs
+stress_test_*.log
