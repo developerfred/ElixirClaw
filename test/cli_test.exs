@@ -26,7 +26,7 @@ defmodule CLITest do
       Application.put_env(:elixir_claw, :gateway_host, "localhost")
       Application.put_env(:elixir_claw, :gateway_port, 18789)
       Application.put_env(:elixir_claw, :caps, ["camera.snap", "screen.snap"])
-      
+
       output = capture_io(fn -> ElixirClaw.CLI.main(["status"]) end)
       assert output =~ "ElixirClaw Status"
       assert output =~ "Node ID: test-node"
@@ -40,7 +40,7 @@ defmodule CLITest do
 
     test "config command outputs config" do
       Application.put_env(:elixir_claw, :test_key, "test_value")
-      
+
       output = capture_io(fn -> ElixirClaw.CLI.main(["config"]) end)
       assert output =~ "test_key"
     end

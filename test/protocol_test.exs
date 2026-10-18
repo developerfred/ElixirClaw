@@ -5,7 +5,7 @@ defmodule ProtocolTest do
     test "generates valid JSON request" do
       result = ElixirClaw.Protocol.encode_request("test.method", %{"key" => "value"})
       assert is_binary(result)
-      
+
       {:ok, decoded} = Jason.decode(result)
       assert decoded["type"] == "req"
       assert decoded["method"] == "test.method"
@@ -24,7 +24,7 @@ defmodule ProtocolTest do
     test "decodes request message" do
       msg = ~s({"type":"req","id":"abc","method":"test.method","params":{}})
       {:ok, result} = ElixirClaw.Protocol.decode(msg)
-      
+
       assert result.type == :req
       assert result.id == "abc"
       assert result.method == "test.method"
@@ -33,7 +33,7 @@ defmodule ProtocolTest do
     test "decodes response message" do
       msg = ~s({"type":"res","id":"abc","ok":true,"payload":{}})
       {:ok, result} = ElixirClaw.Protocol.decode(msg)
-      
+
       assert result.type == :res
       assert result.ok == true
     end
@@ -41,7 +41,7 @@ defmodule ProtocolTest do
     test "decodes event message" do
       msg = ~s({"type":"event","event":"test.event","payload":{"data":1}})
       {:ok, result} = ElixirClaw.Protocol.decode(msg)
-      
+
       assert result.type == :event
       assert result.event == "test.event"
       assert result.payload == %{"data" => 1}

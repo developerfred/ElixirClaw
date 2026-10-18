@@ -37,6 +37,7 @@ defmodule ElixirClaw.Security do
         else
           {:error, :invalid_path}
         end
+
       :error ->
         {:error, :invalid_path}
     end
@@ -160,6 +161,7 @@ defmodule ElixirClaw.Security do
 
   defp sanitize_value(value) when is_binary(value) do
     sanitized = sanitize_input(value)
+
     if byte_size(sanitized) > 1_000_000 do
       :discard
     else
