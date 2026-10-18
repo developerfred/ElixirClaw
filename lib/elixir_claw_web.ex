@@ -8,7 +8,7 @@ defmodule ElixirClawWeb do
 
   def live_view do
     quote do
-      use Phoenix.LiveView, layout: {ElixirClawWeb.Layouts, :live}
+      use Phoenix.LiveView
       import Phoenix.HTML
       import Phoenix.HTML.Form
       import Phoenix.LiveView.Helpers
@@ -40,13 +40,14 @@ end
 defmodule ElixirClawWeb.Layouts do
   use Phoenix.Component
 
-  def live(assigns) do
+  def root(assigns) do
     ~H"""
     <!DOCTYPE html>
     <html lang="en">
       <head>
         <meta charset="utf-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <meta name="csrf-token" content={Plug.CSRFProtection.get_csrf_token()}/>
         <title><%= assigns[:page_title] || "ElixirClaw Dashboard" %></title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -79,9 +80,15 @@ defmodule ElixirClawWeb.Layouts do
         </style>
       </head>
       <body>
-        <div class="dashboard">
-          <%= render_slot(@inner_block) %>
-        </div>
+        <%= @inner_content %>
+        <script src="/assets/phoenix.min.js"></script>
+        <script src="/assets/phoenix_live_view.min.js"></script>
+        <script>
+          var csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content");
+          var liveSocket = new LiveView.LiveSocket("/live", Phoenix.Socket, {params: {_csrf_token: csrfToken}});
+          liveSocket.connect();
+          window.liveSocket = liveSocket;
+        </script>
       </body>
     </html>
     """

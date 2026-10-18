@@ -131,10 +131,21 @@ Monitor your nodes in real-time with a web dashboard:
 
 ```bash
 # Start with dashboard enabled
-ELIXIR_CLAW_START_DASHBOARD=true ./elixir_claw node-start
+ELIXIR_CLAW_START_DASHBOARD=true mix run --no-halt
 
 # Open http://localhost:4000
 ```
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ELIXIR_CLAW_START_DASHBOARD` | `false` | Enable the dashboard |
+| `ELIXIR_CLAW_DASHBOARD_HOST` | `127.0.0.1` | Bind address. The dashboard has no authentication; keep it on localhost or behind a trusted proxy |
+| `ELIXIR_CLAW_DASHBOARD_PORT` | `4000` | HTTP port |
+| `ELIXIR_CLAW_SECRET_KEY_BASE` | random per start | At least 64 bytes; set it to keep sessions across restarts |
+
+> The dashboard serves its JavaScript from the project dependencies, so run it
+> with `mix run` or a release rather than the standalone `elixir_claw` escript.
+> It currently shows demo data from `ElixirClaw.DashboardStub`.
 
 Features:
 - Real-time node status
