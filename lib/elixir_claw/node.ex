@@ -17,33 +17,6 @@ defmodule ElixirClaw.Node do
     end
   end
 
-  def execute("camera.clip", args, opts) when is_map(opts) do
-    node_id = opts[:node_id] || "unknown"
-    request_id = opts[:request_id] || generate_request_id()
-
-    ElixirClaw.Events.emit_started("camera.clip", node_id, request_id, %{
-      duration: args[:duration],
-      device: args[:device]
-    })
-
-    ElixirClaw.Events.emit_progress("camera.clip", node_id, request_id, %{
-      status: "recording",
-      elapsed: 0
-    })
-
-    result = execute("camera.clip", args)
-
-    case result do
-      %{ok: true, data: data} ->
-        ElixirClaw.Events.emit_completed("camera.clip", node_id, request_id, data)
-        result
-
-      %{ok: false, error: error} ->
-        ElixirClaw.Events.emit_failed("camera.clip", node_id, request_id, %{error: error})
-        result
-    end
-  end
-
   def execute("screen.snap", args) do
     with {:ok, _} <- check_cap("screen.snap") do
       result = capture_screen(args[:display] || :main, args[:options] || %{})
@@ -55,28 +28,6 @@ defmodule ElixirClaw.Node do
     with {:ok, _} <- check_cap("screen.record"),
          {:ok, output} <- start_screen_record(args) do
       %{ok: true, data: %{path: output, status: :recording}}
-    end
-  end
-
-  def execute("screen.record", args, opts) when is_map(opts) do
-    node_id = opts[:node_id] || "unknown"
-    request_id = opts[:request_id] || generate_request_id()
-
-    ElixirClaw.Events.emit_started("screen.record", node_id, request_id, %{
-      duration: args[:duration],
-      display: args[:display]
-    })
-
-    result = execute("screen.record", args)
-
-    case result do
-      %{ok: true, data: data} ->
-        ElixirClaw.Events.emit_completed("screen.record", node_id, request_id, data)
-        result
-
-      %{ok: false, error: error} ->
-        ElixirClaw.Events.emit_failed("screen.record", node_id, request_id, %{error: error})
-        result
     end
   end
 
@@ -110,6 +61,55 @@ defmodule ElixirClaw.Node do
 
   def execute(command, _args) do
     %{ok: false, error: "Unknown command: #{command}"}
+  end
+
+  def execute("camera.clip", args, opts) when is_map(opts) do
+    node_id = opts[:node_id] || "unknown"
+    request_id = opts[:request_id] || generate_request_id()
+
+    ElixirClaw.Events.emit_started("camera.clip", node_id, request_id, %{
+      duration: args[:duration],
+      device: args[:device]
+    })
+
+    ElixirClaw.Events.emit_progress("camera.clip", node_id, request_id, %{
+      status: "recording",
+      elapsed: 0
+    })
+
+    result = execute("camera.clip", args)
+
+    case result do
+      %{ok: true, data: data} ->
+        ElixirClaw.Events.emit_completed("camera.clip", node_id, request_id, data)
+        result
+
+      %{ok: false, error: error} ->
+        ElixirClaw.Events.emit_failed("camera.clip", node_id, request_id, %{error: error})
+        result
+    end
+  end
+
+  def execute("screen.record", args, opts) when is_map(opts) do
+    node_id = opts[:node_id] || "unknown"
+    request_id = opts[:request_id] || generate_request_id()
+
+    ElixirClaw.Events.emit_started("screen.record", node_id, request_id, %{
+      duration: args[:duration],
+      display: args[:display]
+    })
+
+    result = execute("screen.record", args)
+
+    case result do
+      %{ok: true, data: data} ->
+        ElixirClaw.Events.emit_completed("screen.record", node_id, request_id, data)
+        result
+
+      %{ok: false, error: error} ->
+        ElixirClaw.Events.emit_failed("screen.record", node_id, request_id, %{error: error})
+        result
+    end
   end
 
   defp generate_request_id do

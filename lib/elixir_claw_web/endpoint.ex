@@ -29,8 +29,4 @@ defmodule ElixirClawWeb.Endpoint do
   def session(_conn) do
     %{}
   end
-
-  defp code_reloading? do
-    Application.get_env(:elixir_claw, __MODULE__)[:code_reloader] || false
-  end
 end

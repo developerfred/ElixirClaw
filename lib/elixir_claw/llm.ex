@@ -449,7 +449,7 @@ defmodule ElixirClaw.LLM do
   end
 
   defp make_post_request(url, headers, body) do
-    case :httpc.request(:post, {url, headers, 'application/json', Jason.encode!(body)}, [], []) do
+    case :httpc.request(:post, {url, headers, ~c"application/json", Jason.encode!(body)}, [], []) do
       {:ok, {{_, 200, _}, _response_headers, response_body}} ->
         case Jason.decode(to_string(response_body)) do
           {:ok, json} -> {:ok, json}
@@ -461,23 +461,23 @@ defmodule ElixirClaw.LLM do
     end
   end
 
-  defp handle_claude_response(response_text, node_id) do
+  defp handle_claude_response(response_text, _node_id) do
     {:ok, response_text}
   end
 
-  defp handle_gpt4_response(response_text, node_id) do
+  defp handle_gpt4_response(response_text, _node_id) do
     {:ok, response_text}
   end
 
-  defp handle_nvidia_response(response_text, node_id) do
+  defp handle_nvidia_response(response_text, _node_id) do
     {:ok, response_text}
   end
 
-  defp handle_openrouter_response(response_text, node_id) do
+  defp handle_openrouter_response(response_text, _node_id) do
     {:ok, response_text}
   end
 
-  defp handle_opencode_response(response_text, node_id) do
+  defp handle_opencode_response(response_text, _node_id) do
     {:ok, response_text}
   end
 

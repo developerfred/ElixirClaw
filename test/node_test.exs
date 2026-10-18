@@ -8,16 +8,21 @@ defmodule NodeTest do
   end
 
   describe "execute/2" do
+    @tag :hardware
     test "camera.snap captures a frame" do
       result = ElixirClaw.Node.execute("camera.snap", %{})
       assert result[:ok] == true
       assert result[:data][:path] != nil
     end
 
+    @tag :hardware
+
     test "camera.snap with device option" do
       result = ElixirClaw.Node.execute("camera.snap", %{device: nil})
       assert result[:ok] == true
     end
+
+    @tag :hardware
 
     test "camera.clip captures a clip with duration" do
       result = ElixirClaw.Node.execute("camera.clip", %{duration: 2})
@@ -25,11 +30,15 @@ defmodule NodeTest do
       assert result[:data][:duration] == 2
     end
 
+    @tag :hardware
+
     test "screen.snap captures screen" do
       result = ElixirClaw.Node.execute("screen.snap", %{})
       assert result[:ok] == true
       assert result[:data][:path] != nil
     end
+
+    @tag :hardware
 
     test "screen.snap with display option" do
       result = ElixirClaw.Node.execute("screen.snap", %{display: :main})
@@ -48,29 +57,41 @@ defmodule NodeTest do
     end
 
     test "system.run with timeout" do
-      result = ElixirClaw.Node.execute("system.run", %{command: "echo", args: ["hello"], timeout: 5000})
+      result =
+        ElixirClaw.Node.execute("system.run", %{command: "echo", args: ["hello"], timeout: 5000})
+
       assert result[:ok] == true
     end
+
+    @tag :hardware
 
     test "system.notify sends notification" do
       result = ElixirClaw.Node.execute("system.notify", %{title: "Test", body: "Message"})
       assert result[:ok] == true
     end
 
+    @tag :hardware
+
     test "system.notify with default title and body" do
       result = ElixirClaw.Node.execute("system.notify", %{})
       assert result[:ok] == true
     end
+
+    @tag :hardware
 
     test "location.get gets location" do
       result = ElixirClaw.Node.execute("location.get", %{})
       assert result[:ok] == true
     end
 
+    @tag :hardware
+
     test "location.get with high_accuracy" do
       result = ElixirClaw.Node.execute("location.get", %{high_accuracy: true})
       assert result[:ok] == true
     end
+
+    @tag :hardware
 
     test "notifications.send is alias for system.notify" do
       result = ElixirClaw.Node.execute("notifications.send", %{title: "Test", body: "Message"})
@@ -84,11 +105,14 @@ defmodule NodeTest do
   end
 
   describe "capability checks" do
+    @tag :hardware
     test "caps :all allows all commands" do
       Application.put_env(:elixir_claw, :caps, :all)
       result = ElixirClaw.Node.execute("camera.snap", %{})
       assert result[:ok] == true
     end
+
+    @tag :hardware
 
     test "caps list allows specific commands" do
       Application.put_env(:elixir_claw, :caps, ["camera.snap"])
@@ -179,6 +203,8 @@ defmodule NodeTest do
       :ok
     end
 
+    @tag :hardware
+
     test "valid notification args" do
       result = ElixirClaw.Node.execute("system.notify", %{title: "Test", body: "Body"})
       assert result[:ok] == true
@@ -194,11 +220,15 @@ defmodule NodeTest do
       assert result == {:error, :invalid_notification_args}
     end
 
+    @tag :hardware
+
     test "long title is truncated" do
       long_title = String.duplicate("A", 1000)
       result = ElixirClaw.Node.execute("system.notify", %{title: long_title, body: "Body"})
       assert result[:ok] == true
     end
+
+    @tag :hardware
 
     test "long body is truncated" do
       long_body = String.duplicate("B", 10000)
