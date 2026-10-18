@@ -31,7 +31,8 @@ defmodule ElixirClaw.MixProject do
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.2"},
       {:phoenix_html, "~> 4.0"},
-      {:plug_cowboy, "~> 2.7"}
+      {:plug_cowboy, "~> 2.7"},
+      {:lazy_html, ">= 0.1.0", only: :test}
     ]
   end
 

@@ -25,8 +25,8 @@ defmodule ElixirClaw.Application do
       {DynamicSupervisor, strategy: :one_for_one, name: ElixirClaw.Gateway.Supervisor}
     ]
 
-    if Application.get_env(:elixir_claw, :start_dashboard, false) do
-      base_children ++ [{ElixirClawWeb.Endpoint, []}]
+    if ElixirClaw.Dashboard.enabled?() do
+      base_children ++ ElixirClaw.Dashboard.children()
     else
       base_children
     end
