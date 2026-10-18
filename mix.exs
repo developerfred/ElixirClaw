@@ -29,7 +29,7 @@ defmodule ElixirClaw.MixProject do
       {:confex, "~> 3.5"},
       {:telemetry, "~> 1.3"},
       {:phoenix, "~> 1.7"},
-      {:phoenix_live_view, "~> 0.20"},
+      {:phoenix_live_view, "~> 1.2"},
       {:phoenix_html, "~> 4.0"},
       {:plug_cowboy, "~> 2.7"}
     ]

@@ -1,7 +1,7 @@
 defmodule ElixirClawWeb do
   def controller do
     quote do
-      use Phoenix.Controller, namespace: ElixirClawWeb
+      use Phoenix.Controller, formats: [:json]
       import Plug.Conn
     end
   end
