@@ -14,6 +14,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Upgraded dependencies to clear 30+ advisories from `mix hex.audit` (cowboy, cowlib, plug, plug_cowboy, phoenix, phoenix_live_view 0.20 -> 1.2, mint, hpax). `cowlib` EEF-CVE-2026-43966 (MEDIUM) remains: 2.21.0 is the latest release and has no fix yet.
 
 ### Fixed
+- `ElixirClaw.Node` no longer crashes with `:enoent` when `scrot`, `ffmpeg`, `notify-send`, `gpspipe`, etc. are not installed. Capabilities return `%{ok: false, error: "required command not found: <cmd>"}`; `location.get` falls back to `unavailable`.
+- Failed screen/camera captures used to be reported as `ok: true` with a path to a file that was never written; they now return `%{ok: false, error: ...}`. `execute/3` can therefore emit its failure event instead of raising.
+- Camera names with spaces (e.g. "FaceTime HD Camera") were rejected as `:invalid_device`; spaces and parentheses are now accepted, while empty names and names starting with `-` are rejected.
 - Compiler warnings in `ElixirClaw.Node` (ungrouped `execute` clauses), `ElixirClaw.LLM` (deprecated charlist, unused variables) and `ElixirClawWeb.Endpoint` (unused function).
 - `GatewaySupervisorTest` tried to start a supervisor the application already runs, and passed a keyword list where `Gateway.start_link/1` expects a map.
 

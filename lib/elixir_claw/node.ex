@@ -3,9 +3,11 @@ defmodule ElixirClaw.Node do
 
   def execute("camera.snap", args) do
     with {:ok, _} <- check_cap("camera.snap"),
-         {:ok, device} <- get_camera_device(args[:device]) do
-      result = capture_frame(device, args[:options] || %{})
-      %{ok: true, data: %{path: result}}
+         {:ok, device} <- get_camera_device(args[:device]),
+         {:ok, path} <- capture_frame(device, args[:options] || %{}) do
+      %{ok: true, data: %{path: path}}
+    else
+      error -> unwrap_failure(error)
     end
   end
 
@@ -14,13 +16,17 @@ defmodule ElixirClaw.Node do
          {:ok, device} <- get_camera_device(args[:device]),
          {:ok, output} <- capture_clip(device, args) do
       %{ok: true, data: %{path: output, duration: args[:duration] || 5}}
+    else
+      error -> unwrap_failure(error)
     end
   end
 
   def execute("screen.snap", args) do
-    with {:ok, _} <- check_cap("screen.snap") do
-      result = capture_screen(args[:display] || :main, args[:options] || %{})
-      %{ok: true, data: %{path: result}}
+    with {:ok, _} <- check_cap("screen.snap"),
+         {:ok, path} <- capture_screen(args[:display] || :main, args[:options] || %{}) do
+      %{ok: true, data: %{path: path}}
+    else
+      error -> unwrap_failure(error)
     end
   end
 
@@ -28,23 +34,29 @@ defmodule ElixirClaw.Node do
     with {:ok, _} <- check_cap("screen.record"),
          {:ok, output} <- start_screen_record(args) do
       %{ok: true, data: %{path: output, status: :recording}}
+    else
+      error -> unwrap_failure(error)
     end
   end
 
   def execute("system.run", args) do
     with {:ok, _} <- check_cap("system.run"),
          {:ok, cmd} <- validate_command(args[:command]),
-         {:ok, sanitized_args} <- sanitize_command_args(args[:args] || []) do
-      result = run_command(cmd, sanitized_args, args[:timeout] || 30000)
+         {:ok, sanitized_args} <- sanitize_command_args(args[:args] || []),
+         {:ok, result} <- run_command(cmd, sanitized_args, args[:timeout] || 30000) do
       %{ok: true, data: result}
+    else
+      error -> unwrap_failure(error)
     end
   end
 
   def execute("system.notify", args) do
     with {:ok, _} <- check_cap("system.notify"),
-         {:ok, sanitized} <- validate_notification_args(args) do
-      send_notification(sanitized[:title] || "ElixirClaw", sanitized[:body] || "", %{})
+         {:ok, sanitized} <- validate_notification_args(args),
+         :ok <- send_notification(sanitized[:title] || "ElixirClaw", sanitized[:body] || "", %{}) do
       %{ok: true, data: %{sent: true}}
+    else
+      error -> unwrap_failure(error)
     end
   end
 
@@ -127,6 +139,54 @@ defmodule ElixirClaw.Node do
     end
   end
 
+  # Runs an external command without raising when the binary is missing.
+  # Returns {:ok, {output, exit_code}} or {:error, {:command, message}}.
+  defp exec(cmd, args, opts) do
+    with :ok <- ensure_executable(cmd) do
+      {:ok, System.cmd(cmd, args, opts)}
+    end
+  rescue
+    e in ErlangError -> {:error, {:command, "failed to run #{cmd}: #{inspect(e.original)}"}}
+  end
+
+  # Like exec/3, but a non-zero exit status is an error too.
+  defp exec_ok(cmd, args, opts \\ []) do
+    case exec(cmd, args, opts) do
+      {:ok, {output, 0}} ->
+        {:ok, output}
+
+      {:ok, {output, code}} ->
+        {:error, {:command, "#{cmd} exited with #{code}: #{String.trim(output)}"}}
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp ensure_executable(cmd) do
+    if System.find_executable(cmd) do
+      :ok
+    else
+      {:error, {:command, "required command not found: #{cmd}"}}
+    end
+  end
+
+  defp command_or_unsupported(:unsupported), do: unsupported_platform()
+  defp command_or_unsupported({_cmd, _args} = command), do: command
+
+  defp unsupported_platform do
+    {:error, {:command, "not supported on this platform"}}
+  end
+
+  defp log_command_failure(prefix, {:error, {:command, message}}) do
+    Logger.error("#{prefix}: #{message}")
+  end
+
+  # Turns a failed external command into the %{ok: false} shape that callers
+  # (and execute/3) expect; validation errors keep their {:error, reason} form.
+  defp unwrap_failure({:error, {:command, message}}), do: %{ok: false, error: message}
+  defp unwrap_failure(other), do: other
+
   defp get_camera_device(preferred) do
     devices = list_cameras()
 
@@ -153,27 +213,27 @@ defmodule ElixirClaw.Node do
   end
 
   defp list_cameras_macos do
-    case System.cmd("system_profiler", ["SPCameraDataType", "-json"]) do
-      {output, 0} ->
+    case exec_ok("system_profiler", ["SPCameraDataType", "-json"]) do
+      {:ok, output} ->
         case Jason.decode(output) do
           {:ok, %{"SPCameraDataType" => cameras}} -> Enum.map(cameras, & &1["_name"])
           _ -> []
         end
 
-      _ ->
+      {:error, _} ->
         []
     end
   end
 
   defp list_cameras_linux do
-    case System.cmd("v4l2-ctl", ["--list-devices"]) do
-      {output, 0} ->
+    case exec_ok("v4l2-ctl", ["--list-devices"]) do
+      {:ok, output} ->
         output
         |> String.split("\n")
         |> Enum.map(&String.trim/1)
         |> Enum.filter(&String.contains?(&1, "/dev/video"))
 
-      _ ->
+      {:error, _} ->
         Path.wildcard("/dev/video*") |> Enum.map(&Path.basename/1)
     end
   end
@@ -183,12 +243,14 @@ defmodule ElixirClaw.Node do
 
     case validate_device(device) do
       {:ok, safe_device} ->
-        {cmd, args} = build_capture_cmd(safe_device, path)
-        execute_capture(cmd, args, path)
+        case build_capture_cmd(safe_device, path) do
+          {cmd, args} -> execute_capture(cmd, args, path)
+          :unsupported -> unsupported_platform()
+        end
 
       {:error, reason} ->
         Logger.error("Invalid device: #{inspect(reason)}")
-        path
+        {:error, reason}
     end
   end
 
@@ -203,28 +265,34 @@ defmodule ElixirClaw.Node do
         {"ffmpeg", ["-y", "-f", "v4l2" | device_arg] ++ ["-frames:v", "1", path]}
 
       _ ->
-        {"echo", ["unsupported"]}
+        :unsupported
     end
   end
 
   defp validate_device(nil), do: {:ok, nil}
 
   defp validate_device(device) when is_binary(device) do
-    safe = device |> String.replace(~r/[^a-zA-Z0-9_\-\.\/]/, "") |> String.slice(0, 255)
-    if safe == device or safe == "", do: {:ok, safe}, else: {:error, :invalid_device}
+    # Device names reach System.cmd (no shell), so spaces and parentheses are safe
+    # ("FaceTime HD Camera (Built-in)"); a leading "-" would be read as an option.
+    if device != "" and byte_size(device) <= 255 and not String.starts_with?(device, "-") and
+         Regex.match?(~r/\A[a-zA-Z0-9_\-\.\/ ()]+\z/, device) do
+      {:ok, device}
+    else
+      {:error, :invalid_device}
+    end
   end
 
   defp validate_device(_), do: {:error, :invalid_device}
 
   defp execute_capture(cmd, args, path) do
-    case System.cmd(cmd, args) do
-      {_, 0} ->
+    case exec_ok(cmd, args) do
+      {:ok, _} ->
         Logger.info("Captured frame to: #{path}")
-        path
+        {:ok, path}
 
-      {output, code} ->
-        Logger.error("Capture failed: #{cmd} exited with #{code}: #{output}")
-        path
+      {:error, _} = error ->
+        log_command_failure("Capture failed", error)
+        error
     end
   end
 
@@ -232,7 +300,7 @@ defmodule ElixirClaw.Node do
     duration = args[:duration] || 5
     path = Path.join(System.tmp_dir!(), "elixir_claw_clip_#{:os.system_time(:millisecond)}.mp4")
 
-    {cmd, args} =
+    command =
       case :os.type() do
         {:unix, :darwin} ->
           {"screencapture", ["-v", "-R0,0,-1,-1", "-t", "mov", path]}
@@ -257,44 +325,56 @@ defmodule ElixirClaw.Node do
            ]}
 
         _ ->
-          {"echo", ["unsupported"]}
+          :unsupported
       end
 
-    case System.cmd(cmd, args) do
-      {_, 0} ->
-        {:ok, path}
+    case command do
+      {cmd, args} ->
+        case exec_ok(cmd, args) do
+          {:ok, _} ->
+            {:ok, path}
 
-      {output, code} ->
-        Logger.error("Clip capture failed: #{cmd} exited with #{code}: #{output}")
-        {:ok, path}
+          {:error, _} = error ->
+            log_command_failure("Clip capture failed", error)
+            error
+        end
+
+      :unsupported ->
+        unsupported_platform()
     end
   end
 
   defp capture_screen(_display, _options) do
     path = Path.join(System.tmp_dir!(), "elixir_claw_screen_#{:os.system_time(:millisecond)}.png")
 
-    {cmd, args} =
+    command =
       case :os.type() do
         {:unix, :darwin} -> {"screencapture", ["-x", path]}
         {:unix, :linux} -> {"scrot", [path]}
-        _ -> {"echo", ["unsupported"]}
+        _ -> :unsupported
       end
 
-    case System.cmd(cmd, args) do
-      {_, 0} ->
-        Logger.info("Captured screen to: #{path}")
-        path
+    case command do
+      {cmd, args} ->
+        case exec_ok(cmd, args) do
+          {:ok, _} ->
+            Logger.info("Captured screen to: #{path}")
+            {:ok, path}
 
-      {output, code} ->
-        Logger.error("Screen capture failed: #{cmd} exited with #{code}: #{output}")
-        path
+          {:error, _} = error ->
+            log_command_failure("Screen capture failed", error)
+            error
+        end
+
+      :unsupported ->
+        unsupported_platform()
     end
   end
 
   defp start_screen_record(_args) do
     path = Path.join(System.tmp_dir!(), "elixir_claw_record_#{:os.system_time(:millisecond)}.mp4")
 
-    {cmd, args} =
+    command =
       case :os.type() do
         {:unix, :darwin} ->
           {"screencapture", ["-v", "-R0,0,-1,-1", "-t", "mov", path]}
@@ -317,12 +397,20 @@ defmodule ElixirClaw.Node do
            ]}
 
         _ ->
-          {"echo", ["unsupported"]}
+          :unsupported
       end
 
-    spawn(fn -> System.cmd(cmd, args, stderr_to_stdout: true) end)
-    Logger.info("Started recording to: #{path}")
-    {:ok, path}
+    with {cmd, args} <- command_or_unsupported(command),
+         :ok <- ensure_executable(cmd) do
+      spawn(fn ->
+        with {:error, _} = error <- exec_ok(cmd, args, stderr_to_stdout: true) do
+          log_command_failure("Screen recording failed", error)
+        end
+      end)
+
+      Logger.info("Started recording to: #{path}")
+      {:ok, path}
+    end
   end
 
   defp validate_command(cmd) when is_binary(cmd) and byte_size(cmd) > 0 do
@@ -361,11 +449,9 @@ defmodule ElixirClaw.Node do
   end
 
   defp run_command(cmd, args, _timeout) do
-    opts = [stderr_to_stdout: true]
-
-    case System.cmd(cmd, args, opts) do
-      {output, 0} -> %{exit_code: 0, stdout: output, stderr: ""}
-      {output, code} -> %{exit_code: code, stdout: output, stderr: ""}
+    case exec(cmd, args, stderr_to_stdout: true) do
+      {:ok, {output, code}} -> {:ok, %{exit_code: code, stdout: output, stderr: ""}}
+      {:error, _} = error -> error
     end
   end
 
@@ -393,15 +479,21 @@ defmodule ElixirClaw.Node do
 
     case :os.type() do
       {:unix, :darwin} ->
-        System.cmd("osascript", ["-e", "display notification \"#{sb}\" with title \"#{st}\""])
+        discard_output(
+          exec_ok("osascript", ["-e", "display notification \"#{sb}\" with title \"#{st}\""])
+        )
 
       {:unix, :linux} ->
-        System.cmd("notify-send", ["--", st, sb])
+        discard_output(exec_ok("notify-send", ["--", st, sb]))
 
       _ ->
         Logger.warning("Notifications not supported")
+        unsupported_platform()
     end
   end
+
+  defp discard_output({:ok, _output}), do: :ok
+  defp discard_output({:error, _} = error), do: error
 
   defp sanitize_shell_arg(arg) when is_binary(arg) do
     arg |> String.replace("\\", "\\\\") |> String.replace("\"", "\\\"") |> String.slice(0, 1000)
@@ -414,8 +506,8 @@ defmodule ElixirClaw.Node do
 
     case :os.type() do
       {:unix, :darwin} ->
-        case System.cmd("defaults", ["read", "com.apple.clock", "IntlLocalityKey"]) do
-          {_output, 0} ->
+        case exec_ok("defaults", ["read", "com.apple.clock", "IntlLocalityKey"]) do
+          {:ok, _output} ->
             %{
               latitude: 0.0,
               longitude: 0.0,
@@ -436,11 +528,11 @@ defmodule ElixirClaw.Node do
         end
 
       {:unix, :linux} ->
-        case System.cmd("gpspipe", ["-w", "-n", "5"]) do
-          {output, 0} ->
+        case exec_ok("gpspipe", ["-w", "-n", "5"]) do
+          {:ok, output} ->
             parse_gps_output(output)
 
-          _ ->
+          {:error, _} ->
             %{
               latitude: 0.0,
               longitude: 0.0,
