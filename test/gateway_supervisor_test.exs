@@ -1,65 +1,46 @@
 defmodule GatewaySupervisorTest do
   use ExUnit.Case
 
+  # ElixirClaw.Gateway.Supervisor is already started by the application,
+  # so these tests exercise the running instance instead of starting a new one.
+
+  defp gateway_config(node_id) do
+    %{node_id: node_id, gateway_host: "127.0.0.1", gateway_port: 18789}
+  end
+
   describe "ElixirClaw.Gateway.Supervisor" do
-    test "start_link initializes dynamic supervisor" do
-      {:ok, pid} = ElixirClaw.Gateway.Supervisor.start_link([])
-      assert is_pid(pid)
-      DynamicSupervisor.stop(pid)
+    test "is started by the application" do
+      assert is_pid(Process.whereis(ElixirClaw.Gateway.Supervisor))
+    end
+
+    test "start_link refuses a second instance" do
+      assert {:error, {:already_started, _pid}} = ElixirClaw.Gateway.Supervisor.start_link([])
     end
 
     test "start_gateway starts a gateway child" do
-      {:ok, pid} = ElixirClaw.Gateway.Supervisor.start_link([])
-      
-      config = [
-        node_id: "test-node-#{:os.system_time(:millisecond)}",
-        gateway_host: "127.0.0.1",
-        gateway_port: 18789
-      ]
-      
-      {:ok, _child} = ElixirClaw.Gateway.Supervisor.start_gateway(config)
-      
-      DynamicSupervisor.stop(pid)
+      node_id = "test-node-#{System.unique_integer([:positive])}"
+
+      assert {:ok, child} = ElixirClaw.Gateway.Supervisor.start_gateway(gateway_config(node_id))
+      assert is_pid(child)
+
+      on_exit(fn -> ElixirClaw.Gateway.Supervisor.stop_gateway(node_id) end)
     end
 
     test "stop_gateway terminates a gateway" do
-      {:ok, pid} = ElixirClaw.Gateway.Supervisor.start_link([])
-      
-      node_id = "test-node-stop-#{:os.system_time(:millisecond)}"
-      
-      config = [
-        node_id: node_id,
-        gateway_host: "127.0.0.1",
-        gateway_port: 18789
-      ]
-      
-      {:ok, _child} = ElixirClaw.Gateway.Supervisor.start_gateway(config)
-      
-      # Give it time to start
-      Process.sleep(100)
-      
-      result = ElixirClaw.Gateway.Supervisor.stop_gateway(node_id)
-      assert result == :ok
-      
-      DynamicSupervisor.stop(pid)
+      node_id = "test-node-stop-#{System.unique_integer([:positive])}"
+
+      assert {:ok, _child} = ElixirClaw.Gateway.Supervisor.start_gateway(gateway_config(node_id))
+
+      assert :ok = ElixirClaw.Gateway.Supervisor.stop_gateway(node_id)
+      assert {:error, :not_found} = ElixirClaw.Gateway.Supervisor.stop_gateway(node_id)
     end
 
     test "stop_gateway returns error for unknown node" do
-      {:ok, pid} = ElixirClaw.Gateway.Supervisor.start_link([])
-      
-      result = ElixirClaw.Gateway.Supervisor.stop_gateway("nonexistent-node")
-      assert result == {:error, :not_found}
-      
-      DynamicSupervisor.stop(pid)
+      assert {:error, :not_found} = ElixirClaw.Gateway.Supervisor.stop_gateway("nonexistent-node")
     end
 
     test "list_gateways returns child processes" do
-      {:ok, pid} = ElixirClaw.Gateway.Supervisor.start_link([])
-      
-      children = ElixirClaw.Gateway.Supervisor.list_gateways()
-      assert is_list(children)
-      
-      DynamicSupervisor.stop(pid)
+      assert is_list(ElixirClaw.Gateway.Supervisor.list_gateways())
     end
   end
 end

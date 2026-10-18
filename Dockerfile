@@ -14,18 +14,19 @@ RUN mix local.rebar --force && \
 COPY . .
 RUN mix escript.build
 
-FROM alpine:3.19
+# The escript needs an Erlang runtime, so reuse the Elixir image as the base.
+FROM elixir:1.19-alpine
 
 WORKDIR /app
 
 RUN apk add --no-cache \
     bash \
     ffmpeg \
-    libv4l-utils \
+    v4l-utils \
     curl \
     scrot \
     imagemagick \
-    notify-send
+    libnotify
 
 COPY --from=builder /app/elixir_claw .
 

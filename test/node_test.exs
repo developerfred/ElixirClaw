@@ -8,34 +8,40 @@ defmodule NodeTest do
   end
 
   describe "execute/2" do
+    @tag :hardware
     test "camera.snap captures a frame" do
       result = ElixirClaw.Node.execute("camera.snap", %{})
       assert result[:ok] == true
       assert result[:data][:path] != nil
     end
 
+    @tag :hardware
     test "camera.snap with device option" do
       result = ElixirClaw.Node.execute("camera.snap", %{device: nil})
       assert result[:ok] == true
     end
 
+    @tag :hardware
     test "camera.clip captures a clip with duration" do
       result = ElixirClaw.Node.execute("camera.clip", %{duration: 2})
       assert result[:ok] == true
       assert result[:data][:duration] == 2
     end
 
+    @tag :hardware
     test "screen.snap captures screen" do
       result = ElixirClaw.Node.execute("screen.snap", %{})
       assert result[:ok] == true
       assert result[:data][:path] != nil
     end
 
+    @tag :hardware
     test "screen.snap with display option" do
       result = ElixirClaw.Node.execute("screen.snap", %{display: :main})
       assert result[:ok] == true
     end
 
+    @tag :hardware
     test "screen.record starts recording" do
       result = ElixirClaw.Node.execute("screen.record", %{})
       assert result[:ok] == true
@@ -48,30 +54,37 @@ defmodule NodeTest do
     end
 
     test "system.run with timeout" do
-      result = ElixirClaw.Node.execute("system.run", %{command: "echo", args: ["hello"], timeout: 5000})
+      result =
+        ElixirClaw.Node.execute("system.run", %{command: "echo", args: ["hello"], timeout: 5000})
+
       assert result[:ok] == true
     end
 
+    @tag :hardware
     test "system.notify sends notification" do
       result = ElixirClaw.Node.execute("system.notify", %{title: "Test", body: "Message"})
       assert result[:ok] == true
     end
 
+    @tag :hardware
     test "system.notify with default title and body" do
       result = ElixirClaw.Node.execute("system.notify", %{})
       assert result[:ok] == true
     end
 
+    @tag :hardware
     test "location.get gets location" do
       result = ElixirClaw.Node.execute("location.get", %{})
       assert result[:ok] == true
     end
 
+    @tag :hardware
     test "location.get with high_accuracy" do
       result = ElixirClaw.Node.execute("location.get", %{high_accuracy: true})
       assert result[:ok] == true
     end
 
+    @tag :hardware
     test "notifications.send is alias for system.notify" do
       result = ElixirClaw.Node.execute("notifications.send", %{title: "Test", body: "Message"})
       assert result[:ok] == true
@@ -84,12 +97,14 @@ defmodule NodeTest do
   end
 
   describe "capability checks" do
+    @tag :hardware
     test "caps :all allows all commands" do
       Application.put_env(:elixir_claw, :caps, :all)
       result = ElixirClaw.Node.execute("camera.snap", %{})
       assert result[:ok] == true
     end
 
+    @tag :hardware
     test "caps list allows specific commands" do
       Application.put_env(:elixir_claw, :caps, ["camera.snap"])
       result = ElixirClaw.Node.execute("camera.snap", %{})
@@ -179,6 +194,7 @@ defmodule NodeTest do
       :ok
     end
 
+    @tag :hardware
     test "valid notification args" do
       result = ElixirClaw.Node.execute("system.notify", %{title: "Test", body: "Body"})
       assert result[:ok] == true
@@ -194,16 +210,73 @@ defmodule NodeTest do
       assert result == {:error, :invalid_notification_args}
     end
 
+    @tag :hardware
     test "long title is truncated" do
       long_title = String.duplicate("A", 1000)
       result = ElixirClaw.Node.execute("system.notify", %{title: long_title, body: "Body"})
       assert result[:ok] == true
     end
 
+    @tag :hardware
     test "long body is truncated" do
       long_body = String.duplicate("B", 10000)
       result = ElixirClaw.Node.execute("system.notify", %{title: "Test", body: long_body})
       assert result[:ok] == true
+    end
+  end
+
+  describe "missing external commands" do
+    # With an empty PATH none of scrot, screencapture, ffmpeg, notify-send,
+    # osascript, gpspipe, etc. can be found, on any platform.
+    setup do
+      old_path = System.get_env("PATH")
+      System.put_env("PATH", "")
+      on_exit(fn -> System.put_env("PATH", old_path) end)
+    end
+
+    test "screen.snap reports the missing command instead of crashing" do
+      assert %{ok: false, error: error} = ElixirClaw.Node.execute("screen.snap", %{})
+      assert error =~ "required command not found"
+    end
+
+    test "screen.record reports the missing command" do
+      assert %{ok: false, error: error} = ElixirClaw.Node.execute("screen.record", %{})
+      assert error =~ "required command not found"
+    end
+
+    test "system.notify reports the missing command" do
+      result = ElixirClaw.Node.execute("system.notify", %{title: "t", body: "b"})
+      assert %{ok: false, error: error} = result
+      assert error =~ "required command not found"
+    end
+
+    test "notifications.send reports the missing command" do
+      result = ElixirClaw.Node.execute("notifications.send", %{title: "t", body: "b"})
+      assert %{ok: false} = result
+    end
+
+    test "system.run reports a missing binary" do
+      result = ElixirClaw.Node.execute("system.run", %{command: "definitely-not-a-binary"})
+      assert %{ok: false, error: "required command not found: definitely-not-a-binary"} = result
+    end
+
+    test "camera.snap returns an error when no camera can be listed" do
+      assert {:error, :no_camera_found} = ElixirClaw.Node.execute("camera.snap", %{})
+    end
+
+    test "camera.clip returns an error when no camera can be listed" do
+      assert {:error, :no_camera_found} = ElixirClaw.Node.execute("camera.clip", %{duration: 1})
+    end
+
+    test "location.get falls back to unavailable" do
+      assert %{ok: true, data: data} = ElixirClaw.Node.execute("location.get", %{})
+      assert data.latitude == 0.0
+      assert data.source in ["unavailable", "gpsd", "corelocation"]
+    end
+
+    test "execute/3 emits a failure event instead of raising" do
+      opts = %{node_id: "missing-cmd-node", request_id: "req-missing"}
+      assert %{ok: false} = ElixirClaw.Node.execute("screen.record", %{}, opts)
     end
   end
 end

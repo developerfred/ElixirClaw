@@ -23,17 +23,17 @@
 - [ ] Add animated demo (GIF)
 
 #### 1.2 Technical Improvements
-- [ ] Add comprehensive tests
-- [ ] Add CI/CD (GitHub Actions)
-- [ ] Add Docker support
+- [x] Add comprehensive tests
+- [x] Add CI/CD (GitHub Actions)
+- [x] Add Docker support
 - [ ] Add Homebrew tap
 - [ ] Add asdf version manager support
 
 #### 1.3 Documentation
-- [ ] Add SECURITY.md
-- [ ] Add CONTRIBUTING.md
-- [ ] Add CHANGELOG.md
-- [ ] Add CODE_OF_CONDUCT.md
+- [x] Add SECURITY.md
+- [x] Add CONTRIBUTING.md
+- [x] Add CHANGELOG.md
+- [x] Add CODE_OF_CONDUCT.md
 
 ---
 

@@ -20,7 +20,7 @@ defmodule SecurityTest do
     test "handles maps recursively" do
       input = %{"key" => "hello\x00world", "nested" => %{"inner" => "\x00bad"}}
       result = ElixirClaw.Security.sanitize_input(input)
-      
+
       assert result["key"] == "helloworld"
       assert result["nested"]["inner"] == "bad"
     end
