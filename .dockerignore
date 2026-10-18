@@ -1,0 +1,8 @@
+_build
+deps
+.git
+.github
+.env
+*.md
+!README.md
+test

@@ -8,8 +8,7 @@ defmodule ElixirClaw.MixProject do
       elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      escript: escript_config(),
-      aliases: aliases()
+      escript: escript_config()
     ]
   end
 
@@ -41,12 +40,6 @@ defmodule ElixirClaw.MixProject do
       main_module: ElixirClaw.CLI,
       name: "elixir_claw",
       emacs: "elixir_claw"
-    ]
-  end
-
-  defp aliases do
-    [
-      "deps.get": ["deps.get", "run -e 'IO.puts \"Dependencies ready\"'"]
     ]
   end
 end
